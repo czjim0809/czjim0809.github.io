@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>手機鏡頭鍵盤 OCR 辨識</title>
+  <!-- 引入 Tesseract.js v5 -->
+  <script src="https://jsdelivr.net"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #111;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #camera-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+    }
+    video, #overlay {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #overlay { pointer-events: none; }
+    #controls {
+      padding: 16px;
+      background: #1e1e1e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      z-index: 10;
+    }
+    #status { font-size: 14px; color: #aaa; flex: 1; }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled { background: #555; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <div id="camera-container">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="controls">
+    <div id="status">準備就緒，請點擊開始</div>
+    <button id="start-btn">啟動鏡頭</button>
+  </div>
+
+  <!-- 用於擷取影像給 OCR 的隱藏畫布 -->
+  <canvas id="process-canvas" style="display:none;"></canvas>
+
+  <script>
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const overlayCtx = overlay.getContext('2d');
+    const processCanvas = document.getElementById('process-canvas');
+    const processCtx = processCanvas.getContext('2d', { willReadFrequently: true });
+    const statusText = document.getElementById('status');
+    const startBtn = document.getElementById('start-btn');
+
+    let worker = null;
+    let isScanning = false;
+
+    // 常見鍵位對照表（可自行擴充客製化提示）
+    const KEY_MAP = {
+      'ESC': 'Esc (退出)',
+      'TAB': 'Tab (縮排)',
+      'CAPS': 'CapsLock (大寫鎖定)',
+      'SHIFT': 'Shift (上檔鍵)',
+      'CTRL': 'Ctrl (控制鍵)',
+      'ALT': 'Alt (切換鍵)',
+      'ENTER': 'Enter (確認)',
+      'BACKSPACE': 'Backspace (退格)',
+      'DEL': 'Delete (刪除)',
+      'DELETE': 'Delete (刪除)',
+      'FN': 'Fn (功能鍵)',
+      'WIN': 'Win (開始選單)'
+    };
+
+    // 初始化 Tesseract Worker
+    async function initOCR() {
+      statusText.textContent = '正在載入 OCR 引擎...';
+      worker = await Tesseract.createWorker('eng');
+      // 限制只辨識大寫英文字母與數字，大幅提升準確率與速度
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-=[]\\;\',./',
+      });
+    }
+
+    // 啟動相機
+    async function startCamera() {
+      startBtn.disabled = true;
+      await initOCR();
+      statusText.textContent = '正在開啟鏡頭...';
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' }, // 優先使用後置鏡頭
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          overlay.width = video.videoWidth;
+          overlay.height = video.videoHeight;
+          processCanvas.width = video.videoWidth;
+          processCanvas.height = video.videoHeight;
+          statusText.textContent = '辨識中... 請將鏡頭對準鍵盤';
+          isScanning = true;
+          scanLoop();
+        };
+      } catch (err) {
+        statusText.textContent = '無法開啟鏡頭：' + err.message;
+        startBtn.disabled = false;
+      }
+    }
+
+    // 影像預處理：轉灰階並增強對比度
+    function preprocessImage() {
+      processCtx.drawImage(video, 0, 0, processCanvas.width, processCanvas.height);
+      const imageData = processCtx.getImageData(0, 0, processCanvas.width, processCanvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        // 灰階公式
+        const avg = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        // 簡單二值化/高對比處理（可依環境光線調整閾值 128）
+        const contrast = avg > 120 ? 255 : 0;
+        data[i] = contrast;     // R
+        data[i + 1] = contrast; // G
+        data[i + 2] = contrast; // B
+      }
+      processCtx.putImageData(imageData, 0, 0);
+    }
+
+    // 持續掃描迴圈
+    async function scanLoop() {
+      if (!isScanning) return;
+
+      preprocessImage();
+      const { data: { words } } = await worker.recognize(processCanvas);
+
+      // 清除上一幀的標記
+      overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+      words.forEach(word => {
+        // 過濾信心度過低的雜訊（低於 60 分不顯示）
+        if (word.confidence < 60) return;
+
+        const cleanText = word.text.trim().toUpperCase();
+        if (!cleanText) return;
+
+        const { x0, y0, x1, y1 } = word.bbox;
+        const label = KEY_MAP[cleanText] || `按鍵: ${cleanText}`;
+
+        // 繪製外框
+        overlayCtx.strokeStyle = '#00FF88';
+        overlayCtx.lineWidth = 3;
+        overlayCtx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+
+        // 繪製文字標籤背景
+        overlayCtx.font = 'bold 20px sans-serif';
+        const textWidth = overlayCtx.measureText(label).width;
+        overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        overlayCtx.fillRect(x0, y0 - 28, textWidth + 12, 28);
+
+        // 繪製鍵位名稱
+        overlayCtx.fillStyle = '#00FF88';
+        overlayCtx.fillText(label, x0 + 6, y0 - 7);
+      });
+
+      // 間隔 800ms 進行下一次辨識，避免手機過熱
+      setTimeout(scanLoop, 800);
+    }
+
+    startBtn.addEventListener('click', startCamera);
+  </script>
+</body>
+</html>
