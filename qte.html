@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>夢魘赫莉娜 QTE 練習器</title>
+<style>
+  body { background:#161822; color:#f0f2f8; font-family:sans-serif; display:flex; justify-content:center; padding:20px; margin:0; }
+  .box { width:100%; max-width:680px; background:#222536; border-radius:14px; padding:24px; box-shadow:0 8px 24px #0006; }
+  h2 { margin:0 0 16px; text-align:center; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; background:#191b28; padding:14px; border-radius:10px; margin-bottom:16px; font-size:14px; }
+  .grid div { display:flex; flex-direction:column; gap:4px; }
+  select, input[type=range] { accent-color:#7c5cff; background:#2e3248; color:#fff; border:1px solid #424866; border-radius:6px; padding:5px; }
+  .bar { display:flex; justify-content:space-between; align-items:center; font-weight:bold; margin-bottom:8px; }
+  .prog { height:8px; background:#12141d; border-radius:4px; overflow:hidden; margin-bottom:18px; }
+  #pFill { height:100%; width:100%; background:#2ecc71; }
+  .keys { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; min-height:84px; align-items:center; background:linear-gradient(180deg, #1b1530, #131122); border-radius:12px; padding:14px 10px; border:2px solid #59369c; margin-bottom:14px; }
+  .k { position:relative; width:66px; height:56px; display:flex; justify-content:center; align-items:center; font-size:24px; font-weight:900; color:#fff; text-shadow:0 2px 4px #1d0538; background:url('butterfly.jpg') center/cover no-repeat; border-radius:10px; transition:transform .08s, filter .1s; user-select:none; }
+  .k.on { transform:scale(1.12); box-shadow:0 0 12px #f1c40f; }
+  .k.ok { filter:hue-rotate(210deg) brightness(1.1); }
+  .k.no { filter:hue-rotate(85deg) brightness(0.8); opacity:.65; transform:scale(.95); text-decoration:line-through; }
+  #msg { text-align:center; font-weight:bold; min-height:24px; margin-bottom:14px; }
+  #sum { display:none; flex-direction:column; gap:10px; background:#161822; padding:14px; border-radius:10px; border:1px solid #424866; margin-bottom:16px; font-size:14px; }
+  .s-row { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; }
+  .mk { display:inline-block; padding:2px 6px; border-radius:4px; margin-right:4px; font-weight:bold; font-size:13px; border:1px solid; }
+  .mk.ok { color:#2ecc71; border-color:#2ecc71; background:#2ecc7122; }
+  .mk.no { color:#e74c3c; border-color:#e74c3c; background:#e74c3c22; }
+  .line-3s { display:inline-block; border-left:2px dashed #f1c40f; color:#f1c40f; font-size:11px; padding-left:4px; margin:0 6px 0 2px; font-weight:bold; }
+  .kb-wrap { text-align:center; margin-bottom:16px; }
+  .kb { display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:8px; }
+  .kb-r { display:flex; gap:5px; }
+  .kk { width:36px; height:36px; border-radius:5px; background:#1c1f2e; border:1px solid #353a54; display:flex; justify-content:center; align-items:center; font-size:13px; color:#888; }
+  .kk.pool { color:#fff; background:#282c40; border-color:#5a628a; }
+  .kk.now { background:#f1c40f; color:#000; font-weight:bold; }
+  button { background:#7c5cff; color:#fff; border:none; border-radius:8px; padding:10px 20px; font-size:15px; font-weight:bold; cursor:pointer; }
+  .btn-sm { background:transparent; border:1px solid #424866; color:#aaa; padding:4px 12px; font-size:12px; border-radius:14px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>夢魘赫莉娜 QTE 練習器</h2>
+  <div class="grid">
+    <div><label>每波秒數：<b id="tTxt" style="color:#f1c40f">5.0 秒</b></label><input type="range" id="tIn" min="1.5" max="10" step="0.5" value="5.0"></div>
+    <div><label>每波鍵數：<b id="cTxt" style="color:#f1c40f">4 鍵</b></label><input type="range" id="cIn" min="2" max="8" step="1" value="4"></div>
+    <div><label>鍵位範圍：</label><select id="pIn"><option value="ASDF">僅下排 (ASDF)</option><option value="QWER">僅上排 (QWER)</option><option value="QWSA">左側 4 鍵 (QWAS)</option><option value="WES D" data-val="WESD">中間 4 鍵 (WESD)</option><option value="ERDF">右側 4 鍵 (ERDF)</option><option value="QWERASDF" selected>完整 8 鍵 (QWERASDF)</option></select></div>
+    <div><label>連續波數：</label><select id="wIn"><option value="1">單波練習 (1波)</option><option value="3" selected>實戰模擬 (連續3波)</option></select></div>
+  </div>
+  <div class="bar"><span id="wTxt" style="background:#7c5cff;padding:3px 10px;border-radius:12px;font-size:13px">準備就緒</span><span id="tmTxt" style="color:#f1c40f;font-size:20px">5.00 秒</span></div>
+  <div class="prog"><div id="pFill"></div></div>
+  <div class="keys" id="kBox"><span style="color:#a992d4">按「開始」或 Enter / 空白鍵</span></div>
+  <div id="msg" style="color:#aaa">建議先從 5秒 + 4鍵 練起，再調至 3秒 + 8鍵</div>
+  <div id="sum"></div>
+  <div class="kb-wrap">
+    <button type="button" class="btn-sm" id="tglBtn">收起虛擬鍵位圖 ▲</button>
+    <div class="kb" id="kb">
+      <div class="kb-r"><div class="kk" data-k="Q">Q</div><div class="kk" data-k="W">W</div><div class="kk" data-k="E">E</div><div class="kk" data-k="R">R</div></div>
+      <div class="kb-r" style="margin-left:16px"><div class="kk" data-k="A">A</div><div class="kk" data-k="S">S</div><div class="kk" data-k="D">D</div><div class="kk" data-k="F"><u>F</u></div></div>
+    </div>
+  </div>
+  <div style="text-align:center"><button id="sBtn">開始 / 重置 (Enter / 空白鍵)</button></div>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  const kks = document.querySelectorAll('.kk');
+  let run = false, dly = false, wv = 0, totW = 3, seq = [], idx = 0, ok = 0, no = 0, t0 = 0, dur = 5000, tm = null, dt = null, recs = [], log = [], showKb = true;
+
+  const getPool = () => $('pIn').value.replace(/\s+/g, '');
+
+  function syncUI() {
+    const s = parseFloat($('tIn').value).toFixed(1);
+    $('tTxt').textContent = s + ' 秒';
+    if (!run) $('tmTxt').textContent = parseFloat(s).toFixed(2) + ' 秒';
+    $('cTxt').textContent = $('cIn').value + ' 鍵';
+    const pool = getPool();
+    kks.forEach(e => { e.classList.toggle('pool', pool.includes(e.dataset.k)); e.classList.remove('now'); });
+  }
+  ['tIn','cIn','pIn'].forEach(id => $(id).addEventListener('input', syncUI));
+
+  $('tglBtn').onclick = () => {
+    $('tglBtn').blur(); showKb = !showKb;
+    $('kb').style.display = showKb ? 'flex' : 'none';
+    $('tglBtn').textContent = showKb ? '收起虛擬鍵位圖 ▲' : '展開虛擬鍵位圖 ▼';
+  };
+
+  const hi = ch => kks.forEach(e => e.classList.toggle('now', e.dataset.k === ch));
+
+  function nextWave() {
+    wv++; dly = false; idx = 0; log = [];
+    const len = +$('cIn').value, pool = getPool();
+    dur = parseFloat($('tIn').value) * 1000;
+    seq = Array.from({length: len}, () => pool[Math.floor(Math.random() * pool.length)]);
+    $('kBox').innerHTML = seq.map((c, i) => `<div class="k ${i===0?'on':''}" id="k${i}">${c}</div>`).join('');
+    hi(seq[0]);
+    $('wTxt').textContent = `第 ${wv} / ${totW} 波`;
+    $('msg').style.color = '#fff'; $('msg').textContent = '請依序輸入！';
+    t0 = performance.now(); clearInterval(tm);
+    tm = setInterval(() => {
+      if (!run || dly) return;
+      const rem = Math.max(0, dur - (performance.now() - t0));
+      $('tmTxt').textContent = (rem / 1000).toFixed(2) + ' 秒';
+      $('pFill').style.width = (rem / dur * 100) + '%';
+      if (rem <= 0) {
+        for (let i = idx; i < seq.length; i++) {
+          $('k'+i).className = 'k no';
+          log.push({t: seq[i], p: '超時', ok: false, over3s: true}); no++;
+        }
+        endWave();
+      }
+    }, 20);
+  }
+
+  function endWave() {
+    clearInterval(tm); hi('');
+    const used = Math.min((performance.now() - t0) / 1000, dur / 1000).toFixed(2);
+    recs.push({w: wv, log, ok: log.filter(x => x.ok).length, tot: seq.length, used});
+    if (wv < totW) {
+      dly = true; $('msg').style.color = '#f1c40f';
+      $('msg').textContent = `第 ${wv} 波完成 (${used}秒)，0.3秒後下一波...`;
+      dt = setTimeout(() => run && nextWave(), 300);
+    } else {
+      run = false; $('wTxt').textContent = '練習結束';
+      const std = totW === 3 && +$('cIn').value === 8 && parseFloat($('tIn').value) <= 3;
+      $('msg').style.color = (std ? ok >= 20 : true) ? '#2ecc71' : '#e74c3c';
+      $('msg').textContent = std
+        ? (ok >= 20 ? `🎉 實戰通關！答對 ${ok}/${ok+no} 鍵` : `💥 實戰失敗 (需20鍵)：答對 ${ok}/${ok+no} 鍵`)
+        : `✅ 完成！答對 ${ok}/${ok+no} 鍵 (${Math.round(ok/(ok+no)*100)}%)`;
+      $('sum').innerHTML = recs.map(r => {
+        let marked = false;
+        const keysHtml = r.log.map(x => {
+          let line = '';
+          if (x.over3s && !marked) { marked = true; line = `<span class="line-3s">3秒線</span>`; }
+          return `${line}<span class="mk ${x.ok?'ok':'no'}">${x.t}${x.ok?'':'('+x.p+')'}</span>`;
+        }).join('');
+        return `<div class="s-row"><b style="color:#f1c40f">第${r.w}波</b><div>${keysHtml}</div><b>${r.ok}/${r.tot} <span style="color:#f1c40f">(${r.used}秒)</span></b></div>`;
+      }).join('');
+      $('sum').style.display = 'flex';
+    }
+  }
+
+  function start() {
+    $('sBtn').blur(); clearInterval(tm); clearTimeout(dt);
+    run = true; dly = false; wv = 0; ok = 0; no = 0; recs = [];
+    totW = +$('wIn').value; $('pFill').style.width = '100%';
+    $('sum').style.display = 'none'; nextWave();
+  }
+
+  $('sBtn').onclick = start;
+  window.onkeydown = e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); start(); return; }
+    if (!run || dly || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+    const p = e.key.toUpperCase();
+    if (!/^[A-Z]$/.test(p)) return;
+    const t = seq[idx], isOk = p === t;
+    const over3s = (performance.now() - t0) > 3000;
+    isOk ? ok++ : no++;
+    $('k'+idx).className = 'k ' + (isOk ? 'ok' : 'no');
+    log.push({t, p, ok: isOk, over3s});
+    idx++;
+    if (idx < seq.length) { $('k'+idx).classList.add('on'); hi(seq[idx]); }
+    else endWave();
+  };
+  syncUI();
+</script>
+</body>
+</html>
